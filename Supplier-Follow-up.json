@@ -1,0 +1,388 @@
+{
+  "name": "Trade Compliance - Supplier Follow-up",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "99e26da5-06ce-4729-adc9-53bf5c7f455e",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -912,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Expects due_date as YYYY-MM-DD (recommended) or DD/MM/YYYY.\nconst today = new Intl.DateTimeFormat('en-CA', {\n  timeZone: 'America/Argentina/Buenos_Aires',\n  year: 'numeric', month: '2-digit', day: '2-digit'\n}).format(new Date());\n\nfunction normalizeDate(value) {\n  const s = String(value ?? '').trim();\n  if (/^\\d{4}-\\d{2}-\\d{2}$/.test(s)) return s;\n  const dmy = s.match(/^(\\d{1,2})\\/(\\d{1,2})\\/(\\d{4})$/);\n  if (dmy) return `${dmy[3]}-${dmy[2].padStart(2,'0')}-${dmy[1].padStart(2,'0')}`;\n  return '';\n}\n\nreturn $input.all().map(item => {\n  const row = item.json;\n  const status = String(row.document_status ?? '').trim().toLowerCase();\n  const dueDate = normalizeDate(row.due_date);\n  let followUpStatus;\n  if (status === 'received') followUpStatus = 'RECEIVED';\n  else if (status === 'pending' && dueDate && dueDate < today) followUpStatus = 'OVERDUE';\n  else if (status === 'pending' && dueDate) followUpStatus = 'PENDING_ON_TIME';\n  else followUpStatus = 'REVIEW_REQUIRED';\n  return { json: { ...row, due_date: dueDate || row.due_date, follow_up_status: followUpStatus, evaluation_date: today, email_status: String(row.email_status ?? '').trim(), approval_status: String(row.approval_status ?? '').trim() } };\n});"
+      },
+      "id": "d2eb5659-75a5-4c7b-b86e-fafd6e7635e4",
+      "name": "Evaluate Document Status",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -448,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_YOUR_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Supplier_Tracking",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -688,
+        96
+      ],
+      "id": "571a284d-2b8f-4948-81a1-9524bbb6d3a3",
+      "name": "Read Supplier Tracking Rows"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d181fc71-df25-4bb6-a2a9-edffe561204b",
+              "name": "email_subject",
+              "value": "={{ 'Follow-up required – ' + $json.operation_id + ' – ' + $json.document_required }}",
+              "type": "string"
+            },
+            {
+              "id": "8cc4dff7-f3ef-430b-a898-72e187577052",
+              "name": "email_body",
+              "value": "={{ 'Hi ' + $json.supplier + ',' + '\\n\\n' + 'I’m following up on the ' + $json.document_required + ' required for import operation ' + $json.operation_id + '. Our records indicate that the document was due on ' + $json.due_date + ' and is still pending.' + '\\n\\n' + 'Could you please provide the document at your earliest convenience?' + '\\n\\n' + 'Best regards,' + '\\n' + 'Trade Compliance Team' }}",
+              "type": "string"
+            },
+            {
+              "id": "6cc7c86a-6064-4632-a152-a3e99326d92d",
+              "name": "email_status",
+              "value": "PENDING_APPROVAL",
+              "type": "string"
+            },
+            {
+              "id": "approval-reset-en",
+              "name": "approval_status",
+              "value": "NOT_APPROVED",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        0,
+        0
+      ],
+      "id": "dcf5b3b7-d81b-4e5e-bb19-472707840583",
+      "name": "Prepare Follow-up Draft"
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_YOUR_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Supplier_Tracking",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "operation_id": "={{ $json.operation_id }}",
+            "document_record_id": "={{ $json.document_record_id }}",
+            "supplier": "={{ $json.supplier }}",
+            "document_required": "={{ $json.document_required }}",
+            "document_status": "={{ $json.document_status }}",
+            "due_date": "={{ $json.due_date }}",
+            "supplier_email": "={{ $json.supplier_email }}",
+            "follow_up_status": "={{ $json.follow_up_status }}",
+            "evaluation_date": "={{ $json.evaluation_date }}",
+            "email_subject": "={{ $json.email_subject }}",
+            "email_body": "={{ $json.email_body }}",
+            "email_status": "={{ $json.email_status }}",
+            "approval_status": "={{ $json.approval_status }}"
+          },
+          "matchingColumns": [
+            "document_record_id"
+          ],
+          "schema": [
+            {
+              "id": "operation_id",
+              "displayName": "operation_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "document_record_id",
+              "displayName": "document_record_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "supplier",
+              "displayName": "supplier",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "document_required",
+              "displayName": "document_required",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "document_status",
+              "displayName": "document_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "due_date",
+              "displayName": "due_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "supplier_email",
+              "displayName": "supplier_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "follow_up_status",
+              "displayName": "follow_up_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "evaluation_date",
+              "displayName": "evaluation_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "email_subject",
+              "displayName": "email_subject",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "email_body",
+              "displayName": "email_body",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "email_status",
+              "displayName": "email_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "approval_status",
+              "displayName": "approval_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        224,
+        0
+      ],
+      "id": "49c2f23f-c15c-4d86-8d16-51c52f674a22",
+      "name": "Update Supplier Tracking Row"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "c71e623d-565d-4276-9b9d-8edea1d6e8d2",
+              "leftValue": "={{ $json.follow_up_status }}",
+              "rightValue": "OVERDUE",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            },
+            {
+              "id": "8c6964d2-8467-4e0a-ae27-ce8bd066356e",
+              "leftValue": "={{ $json.document_status }}",
+              "rightValue": "pending",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            },
+            {
+              "id": "2bb30be2-8ab2-407b-ab1d-e1f9408f5576",
+              "leftValue": "={{ $json.email_status }}",
+              "rightValue": "SENT",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals",
+                "name": "filter.operator.notEquals"
+              }
+            },
+            {
+              "id": "cond-not-pending-approval",
+              "leftValue": "={{ $json.email_status }}",
+              "rightValue": "PENDING_APPROVAL",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals",
+                "name": "filter.operator.notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -224,
+        96
+      ],
+      "id": "d234f0df-2a32-4c36-a7a0-aa44f8396109",
+      "name": "Is a New Overdue Follow-up Required?"
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Read Supplier Tracking Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Supplier Tracking Rows": {
+      "main": [
+        [
+          {
+            "node": "Evaluate Document Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evaluate Document Status": {
+      "main": [
+        [
+          {
+            "node": "Is a New Overdue Follow-up Required?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is a New Overdue Follow-up Required?": {
+      "main": [
+        [
+          {
+            "node": "Prepare Follow-up Draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Follow-up Draft": {
+      "main": [
+        [
+          {
+            "node": "Update Supplier Tracking Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  }
+}

@@ -1,0 +1,349 @@
+{
+  "name": "Trade Compliance - Approved Email Dispatch",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -928,
+        112
+      ],
+      "id": "120b7a0f-ac4d-4e87-9884-3632283885f8",
+      "name": "Manual Trigger"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_YOUR_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Supplier_Tracking",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -704,
+        112
+      ],
+      "id": "d3d866d3-89b0-403d-981a-fa00aa76ccae",
+      "name": "Read Supplier Tracking Rows"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "cond-approval",
+              "leftValue": "={{ $json.approval_status }}",
+              "rightValue": "APPROVED",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            },
+            {
+              "id": "cond-email",
+              "leftValue": "={{ $json.email_status }}",
+              "rightValue": "PENDING_APPROVAL",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            },
+            {
+              "id": "cond-doc",
+              "leftValue": "={{ $json.document_status }}",
+              "rightValue": "pending",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            },
+            {
+              "id": "cond-overdue",
+              "leftValue": "={{ $json.follow_up_status }}",
+              "rightValue": "OVERDUE",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -480,
+        112
+      ],
+      "id": "650b385e-eb78-4fc7-9daa-3789673808ba",
+      "name": "Is Email Eligible for Dispatch?"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.supplier_email }}",
+        "subject": "={{ $json.email_subject }}",
+        "message": "={{ $json.email_body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "eed32354-dc06-4a8c-90e1-443b9c9d55d5",
+      "name": "Send Approved Email"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_YOUR_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Supplier_Tracking",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "document_record_id": "={{ $(\"Is Email Eligible for Dispatch?\").item.json.document_record_id }}",
+            "operation_id": "={{ $(\"Is Email Eligible for Dispatch?\").item.json.operation_id }}",
+            "supplier": "={{ $(\"Is Email Eligible for Dispatch?\").item.json.supplier }}",
+            "document_required": "={{ $(\"Is Email Eligible for Dispatch?\").item.json.document_required }}",
+            "document_status": "={{ $(\"Is Email Eligible for Dispatch?\").item.json.document_status }}",
+            "due_date": "={{ $(\"Is Email Eligible for Dispatch?\").item.json.due_date }}",
+            "supplier_email": "={{ $(\"Is Email Eligible for Dispatch?\").item.json.supplier_email }}",
+            "follow_up_status": "={{ $(\"Is Email Eligible for Dispatch?\").item.json.follow_up_status }}",
+            "evaluation_date": "={{ $(\"Is Email Eligible for Dispatch?\").item.json.evaluation_date }}",
+            "email_subject": "={{ $(\"Is Email Eligible for Dispatch?\").item.json.email_subject }}",
+            "email_body": "={{ $(\"Is Email Eligible for Dispatch?\").item.json.email_body }}",
+            "approval_status": "={{ $(\"Is Email Eligible for Dispatch?\").item.json.approval_status }}",
+            "email_status": "SENT"
+          },
+          "matchingColumns": [
+            "document_record_id"
+          ],
+          "schema": [
+            {
+              "id": "operation_id",
+              "displayName": "operation_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "document_record_id",
+              "displayName": "document_record_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "supplier",
+              "displayName": "supplier",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "document_required",
+              "displayName": "document_required",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "document_status",
+              "displayName": "document_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "due_date",
+              "displayName": "due_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "supplier_email",
+              "displayName": "supplier_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "follow_up_status",
+              "displayName": "follow_up_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "evaluation_date",
+              "displayName": "evaluation_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "email_subject",
+              "displayName": "email_subject",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "email_body",
+              "displayName": "email_body",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "email_status",
+              "displayName": "email_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "approval_status",
+              "displayName": "approval_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        224,
+        0
+      ],
+      "id": "02fd0b1a-4c33-4669-aeca-4a897e9e880c",
+      "name": "Mark Email as Sent"
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Read Supplier Tracking Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Supplier Tracking Rows": {
+      "main": [
+        [
+          {
+            "node": "Is Email Eligible for Dispatch?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Email Eligible for Dispatch?": {
+      "main": [
+        [
+          {
+            "node": "Send Approved Email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Send Approved Email": {
+      "main": [
+        [
+          {
+            "node": "Mark Email as Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  }
+}
